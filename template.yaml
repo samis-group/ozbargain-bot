@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ozbargainbot
+
+Parameters:
+  ozbargainTimestamp:
+    Type: String
+    Default: "/ozbargain/timestamp"
+  verbose:
+    Type: String
+    Default: "false"
+
+Globals:
+  Function:
+    Timeout: 60
+    Runtime: python3.8
+
+Resources:
+  OzBargainBotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: python/app/
+      Handler: lambda_handler.lambda_handler
+      Environment:
+        Variables:
+          OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
+          VERBOSE: !Ref verbose
+      Events:
+        ScheduledEvent:
+          Type: Schedule
+          Properties:
+            Description: Run every minute
+            Enabled: True
+            Schedule: 'rate(1 minute)'
+      Policies:
+        - Statement:
+            - Sid: SSMGetParametersPolicy
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+                - ssm:GetParametersByPath
+                - ssm:PutParameter
+              Resource: !Sub "arn:aws:ssm:${ AWS::Region }:${ AWS::AccountId }:parameter/ozbargain/*"
