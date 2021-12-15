@@ -48,14 +48,14 @@ class Ozbargain():
         return parameter
 
     def get_setting(self, setting_name):
-        envVar = setting_name.upper()
-        paramPath = f'{envVar}_PARAMETER'
-        if envVar in os.environ:
-            return os.environ[envVar]
-        elif paramPath in os.environ:
-            return self.get_ssm_parameter_value(os.environ[paramPath])
+        env_var = setting_name.upper()
+        param_path = f'{env_var}_PARAMETER'
+        if env_var in os.environ:
+            return os.environ[env_var]
+        elif param_path in os.environ:
+            return self.get_ssm_parameter_value(os.environ[param_path])
         else:
-            raise Exception(f"You must specify either {envVar} or {paramPath}")
+            raise Exception(f"You must specify either {env_var} or {param_path}")
 
     def get_xml_tree(self, xml_file=False):
         self.__logger.info("Getting XML Tree...")
