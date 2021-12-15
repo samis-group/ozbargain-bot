@@ -10,22 +10,24 @@ from bs4 import BeautifulSoup
 class Ozbargain():
     def __init__(self, logger) -> None:
         self.__logger = logger
-        self.slack_webhook = self.get_setting('slack_webhook')
+        self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
+        self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
+        self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
+        self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
         self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
-        self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
         self.default_timedelta_minutes = 5
         self.namespace = {'ozb': 'https://www.ozbargain.com.au'}
 
     def validate(self):
         self.__logger.info("Validating...")
-        if not self.slack_webhook:
-            raise Exception("No slack Webhook defined in environment variable 'SLACK_WEBHOOK'")
         if not self.ssm:
             raise Exception("Unable to connect to SSM.")
-        if not os.environ['CURL_COOKIE']:
-            raise Exception("Unable to locate required curl cookie.")
-        if not os.environ['OZBARGAIN_TIMESTAMP_PARAMETER']:
+        if not self.slack_webhook:
+            raise Exception("No slack Webhook defined in environment variable or SSM Parameter 'ozbargain_slack_webhook'")
+        if not self.curl_cookie:
+            raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
+        if not self.timestamp_parameter:
             raise Exception("'OZBARGAIN_TIMESTAMP_PARAMETER' environment variable for SSM parameter store string required.")
 
     def get_ssm_parameter_value(self, parameter_path):
@@ -55,14 +57,17 @@ class Ozbargain():
         else:
             raise Exception(f"You must specify either {envVar} or {paramPath}")
 
-    def get_xml_tree(self):
+    def get_xml_tree(self, xml_file=False):
         self.__logger.info("Getting XML Tree...")
-        curl_cookie = self.get_setting('curl_cookie')
-        headers = {}
-        headers['cache-control'] = "max-age=0"
-        headers['cookie'] = f"G_ENABLED_IDPS=google; PHPSESSID={curl_cookie}"
-        xml_feed = requests.get(self.ozbargain_feed_url, headers=headers)
-        xml_tree = ET.fromstring(xml_feed.content)
+        if xml_file:
+            with open(xml_file, 'r') as file:
+                xml_feed = file.read()
+        else:
+            headers = {}
+            headers['cache-control'] = "max-age=0"
+            headers['cookie'] = f"G_ENABLED_IDPS=google; PHPSESSID={self.curl_cookie}"
+            xml_feed = requests.get(self.ozbargain_feed_url, headers=headers).content
+        xml_tree = ET.fromstring(xml_feed)
         return xml_tree
 
     def get_last_request_timestamp(self):
@@ -77,8 +82,8 @@ class Ozbargain():
 
     def get_deal_data(self, item):
         # Certain characters need to be stripped So that they don't break the formatting of the slack messages.
-        strip_items_title = ["&", "<", ">", "*"]
-        strip_items_other = ["&", "{", "}", "*"]
+        strip_items_title = ["|", "<", ">", "*"]
+        strip_items_other = ["|", "{", "}", "*"]
         title = item.find('title').text
         title = self.strip_items(strip_items_title, title)
         self.__logger.debug(f'title: {title}')
@@ -88,7 +93,7 @@ class Ozbargain():
         link = self.strip_items(strip_items_other, link)
         self.__logger.debug(f'link: {link}')
         category = item.find('category').text
-        category = self.strip_items(strip_items_other, category)
+        category = self.strip_items(["{", "}", "*"], category)
         self.__logger.debug(f'category: {category}')
         category_link = item.find('category').attrib['domain']
         category_link = self.strip_items(strip_items_other, category_link)
@@ -111,12 +116,18 @@ class Ozbargain():
         description = self.strip_items(strip_items_other, description)
         self.__logger.debug(f'description: {description}')
         # The rest of the data is in the ozb:meta namespace in XML
-        image = item.find('ozb:meta', self.namespace).attrib['image']
-        image = self.strip_items(strip_items_other, image)
-        self.__logger.debug(f'image: {image}')
-        if not image:
+
+        try:
+            image = item.find('ozb:meta', self.namespace).attrib['image']
+            image = self.strip_items(strip_items_other, image)
+        except KeyError:
             image = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/300px-No_image_available.svg.png"
-        direct_url = item.find('ozb:meta', self.namespace).attrib['url']
+        self.__logger.debug(f'image: {image}')
+        try:
+            direct_url = item.find('ozb:meta', self.namespace).attrib['url']
+        except KeyError:
+            self.__logger.warning(f"Unable to find dealer link, defaulting to ozbargain deals page.")
+            direct_url = "https://www.ozbargain.com.au/deals/"
         self.__logger.debug(f'direct_url: {direct_url}')
         return title, pub_date, link, category, category_link, comments, description, image, direct_url
 
@@ -218,7 +229,51 @@ class Ozbargain():
         response = requests.post(
             self.slack_webhook,
             data=json.dumps(payload),
-            headers={'Content-Type': 'application/json'},
-            verify=False
+            headers={'Content-Type': 'application/json'}
         )
         return response.status_code, response.text
+
+    def execute(self):
+        self.validate()
+        # If the user specifies an XML file for testing, let it override grabbing the feed from ozbargain site
+        if 'XML_FILE' in os.environ:
+            xml_file = self.get_setting('XML_FILE')
+            if os.path.isfile(xml_file):
+                self.__logger.debug(f"XML_FILE found at: {xml_file}")
+            else:
+                raise Exception(f"XML_FILE specified in environment variables but file not accessible: {xml_file}")
+        else:
+            xml_file = False
+        # Let the user override the SSM Parameter timestamp if they wish
+        if 'TIMESTAMP_OVERRIDE' in os.environ:
+            last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
+            self.__logger.debug(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
+        else:
+            last_request_timestamp = self.get_last_request_timestamp()
+        
+        xml_tree = self.get_xml_tree(xml_file)
+        channel = xml_tree.find('channel')
+        items = list(channel.iterfind('item'))
+        for item in items:
+            title, pub_date, link, category, category_link, comments, description, image, direct_url = self.get_deal_data(item)
+            epoch_pub_date = self.get_timestamp(pub_date)
+            if epoch_pub_date > last_request_timestamp:
+                payload = self.ready_payload(title, link, category, category_link, comments, description, image, direct_url)
+                response_code, response_text = self.post_to_slack(payload)
+                if response_code != 200:
+                    raise Exception(f"Request to slack returned an error: {response_text}")
+                else:
+                    self.__logger.info(f"item processed successfully:\n{title}")
+            else:
+                self.__logger.info(f"Breaking, as this item is up to date with last published to slack:\n{title}")
+                break
+
+        # Update timestamp SSM param with latest deal published timestamp
+        new_epoch_timestamp = self.get_timestamp(items[0].find('pubDate').text)
+        if last_request_timestamp != new_epoch_timestamp:
+            self.set_ssm_parameter_value(
+                parameter_path=self.timestamp_parameter,
+                value=new_epoch_timestamp
+            )
+        else:
+            self.__logger.debug(f"Latest deal already published to slack.")

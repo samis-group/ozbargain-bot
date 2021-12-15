@@ -3,12 +3,19 @@ Transform: AWS::Serverless-2016-10-31
 Description: ozbargainbot
 
 Parameters:
-  ozbargainTimestamp:
-    Type: String
-    Default: "/ozbargain/timestamp"
   verbose:
     Type: String
     Default: "false"
+  # Make sure the following exist in SSM Parameter store
+  ozbargainTimestamp:
+    Type: String
+    Default: "/ozbargain/timestamp"
+  ozbargainSlackWebhook:
+    Type: String
+    Default: "/ozbargain/slack_webhook"
+  ozbargainCurlCookie:
+    Type: String
+    Default: "/ozbargain/curl_cookie"
 
 Globals:
   Function:
@@ -24,6 +31,8 @@ Resources:
       Environment:
         Variables:
           OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
+          OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
+          OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
           VERBOSE: !Ref verbose
       Events:
         ScheduledEvent:
