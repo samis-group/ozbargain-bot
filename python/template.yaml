@@ -26,7 +26,7 @@ Resources:
   OzBargainBotFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: python/app/
+      CodeUri: app/
       Handler: lambda_handler.lambda_handler
       Environment:
         Variables:
