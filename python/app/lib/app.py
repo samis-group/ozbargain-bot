@@ -6,29 +6,37 @@ import json
 import os
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
+import html
 
 class Ozbargain():
     def __init__(self, logger) -> None:
         self.__logger = logger
-        self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
-        self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
-        self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
-        self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
+        # Do some validation for required params
+        try:
+            self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
+        except:
+            raise Exception("Unable to connect to SSM.")
+        try:
+            self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
+        except:
+            raise Exception("No slack Webhook defined in environment variable or SSM Parameter 'ozbargain_slack_webhook'")
+        try:
+            self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
+        except:
+            raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
+        try:
+            # Try to get the SSM parameter
+            self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
+        except:
+            try:
+                # Try to get the file path instead
+                self.timestamp_file = self.get_setting('TIMESTAMP_FILE')
+            except:
+                raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
         self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
         self.default_timedelta_minutes = 5
         self.namespace = {'ozb': 'https://www.ozbargain.com.au'}
-
-    def validate(self):
-        self.__logger.info("Validating...")
-        if not self.ssm:
-            raise Exception("Unable to connect to SSM.")
-        if not self.slack_webhook:
-            raise Exception("No slack Webhook defined in environment variable or SSM Parameter 'ozbargain_slack_webhook'")
-        if not self.curl_cookie:
-            raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
-        if not self.timestamp_parameter:
-            raise Exception("'OZBARGAIN_TIMESTAMP_PARAMETER' environment variable for SSM parameter store string required.")
 
     def get_ssm_parameter_value(self, parameter_path):
         parameter = self.ssm.get_parameter(
@@ -37,15 +45,28 @@ class Ozbargain():
         result = parameter['Parameter']['Value']
         return result
 
-    def set_ssm_parameter_value(self, parameter_path, value):
-        parameter = self.ssm.put_parameter(
-            Name=parameter_path,
-            Value=str(value),
-            Type='String',
-            Overwrite=True
-        )
-        self.__logger.info(f"Updated SSM parameter '{parameter_path}' to '{value}'.")
-        return parameter
+    def set_timestamp_parameter_value(self, value):
+        # If file exists, write timestamp to it instead of SSM param
+        if self.timestamp_file:
+            self.__logger.debug(f"Timestamp file specified at: {self.timestamp_file}")
+            # If file doesn't exist, let's try to create it for them
+            if not os.path.isfile(self.timestamp_file):
+                self.__logger.debug("File doesn't exist, creating...")
+            with open(self.timestamp_file, 'w+') as file:
+                file.write(str(value))
+                self.__logger.debug("Wrote timestamp to file...")
+        # Else write to SSM
+        else:
+            try:
+                self.ssm.put_parameter(
+                    Name=self.timestamp_parameter,
+                    Value=str(value),
+                    Type='String',
+                    Overwrite=True
+                )
+            except Exception as e:
+                self.__logger.error(f"Error setting param in SSM: {e}")
+            self.__logger.info(f"Updated SSM parameter '{self.timestamp_parameter}' to '{value}'.")
 
     def get_setting(self, setting_name):
         env_var = setting_name.upper()
@@ -70,21 +91,13 @@ class Ozbargain():
         xml_tree = ET.fromstring(xml_feed)
         return xml_tree
 
-    def get_last_request_timestamp(self):
-        try:
-            self.__logger.info("getting timestamp from SSM...")
-            last_request_timestamp = int(self.get_setting('ozbargain_timestamp'))
-        except Exception as e:
-            self.__logger.error(f"unable to obtain last published timestamp from SSM, generating one... error: {e}")
-            last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
-        self.__logger.debug(f"last_request_timestamp: {last_request_timestamp}")
-        return last_request_timestamp
-
     def get_deal_data(self, item):
         # Certain characters need to be stripped So that they don't break the formatting of the slack messages.
         strip_items_title = ["|", "<", ">", "*"]
         strip_items_other = ["|", "{", "}", "*"]
         title = item.find('title').text
+        title_escaped = html.unescape(title)
+        self.__logger.debug(f'title_escaped: {title_escaped}')
         title = self.strip_items(strip_items_title, title)
         self.__logger.debug(f'title: {title}')
         pub_date = item.find('pubDate').text
@@ -234,7 +247,6 @@ class Ozbargain():
         return response.status_code, response.text
 
     def execute(self):
-        self.validate()
         # If the user specifies an XML file for testing, let it override grabbing the feed from ozbargain site
         if 'XML_FILE' in os.environ:
             xml_file = self.get_setting('XML_FILE')
@@ -248,9 +260,24 @@ class Ozbargain():
         if 'TIMESTAMP_OVERRIDE' in os.environ:
             last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
             self.__logger.debug(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
+        # If file is specified and exists, grab that value
+        elif os.path.isfile(self.timestamp_file):
+            with open(self.timestamp_file) as file:
+                file_contents = file.read()
+                self.__logger.debug(f"file timestamp contents: {file_contents}")
+                if not file_contents:
+                    last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
+                else:
+                    last_request_timestamp = int(file_contents)
         else:
-            last_request_timestamp = self.get_last_request_timestamp()
-        
+            try:
+                self.__logger.info("getting timestamp from SSM...")
+                last_request_timestamp = int(self.get_setting('ozbargain_timestamp'))
+            except Exception as e:
+                self.__logger.error(f"unable to obtain last published timestamp from SSM, generating one... error: {e}")
+                last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
+        self.__logger.debug(f"last_request_timestamp: {last_request_timestamp}")
+
         xml_tree = self.get_xml_tree(xml_file)
         channel = xml_tree.find('channel')
         items = list(channel.iterfind('item'))
@@ -271,8 +298,7 @@ class Ozbargain():
         # Update timestamp SSM param with latest deal published timestamp
         new_epoch_timestamp = self.get_timestamp(items[0].find('pubDate').text)
         if last_request_timestamp != new_epoch_timestamp:
-            self.set_ssm_parameter_value(
-                parameter_path=self.timestamp_parameter,
+            self.set_timestamp_parameter_value(
                 value=new_epoch_timestamp
             )
         else:

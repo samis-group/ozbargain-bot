@@ -19,14 +19,15 @@ OZBARGAIN_TIMESTAMP_PARAMETER = "/ozbargain/timestamp"
 VERBOSE = "false"
 ```
 
-If not using params store, hard code them in the environment vars without the **_PARAMETER** suffix:
+If not using params store, hard code them in the environment vars without the **_PARAMETER** suffix (you can even use a file to record/get timestamp):
 
 ```shell
 # Grab this from your browser making a request to the "https://www.ozbargain.com.au/deals/" page, open up devtools and look for the Request Header "Cookie" on the main /deals/ endpoint and grab everything in that header value starting with 'PHPSESSID='.
 OZBARGAIN_CURL_COOKIE = "PHPSESSID=XXXXXXXXXXXXXX; _ga=XXXXXXXXXXXXXXX"
 OZBARGAIN_SLACK_WEBHOOK = "https://hooks.slack.com/services/XXXXXXXXXX/XXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXX"
-OZBARGAIN_TIMESTAMP_PARAMETER = "/ozbargain/timestamp"
+TIMESTAMP_FILE: "/path/to/file/oz2slack.timestamp"
 VERBOSE = "false"
+XML_FILE: "/path/to/file/feed"
 ```
 
 The following should be set if you're testing locally:
@@ -35,4 +36,6 @@ The following should be set if you're testing locally:
 AWS_REGION = "ap-southeast-2"
 XML_FILE = "/root/feed"     # Specify an optional path to an xml file you want to load for testing. Leave blank if you want to hit ozbargain feed.
 TIMESTAMP_OVERRIDE = "1"    # If you want to override the timestamp that is set and get in ssm parameter.
+# OR
+TIMESTAMP_FILE: "/path/to/file/oz2slack.timestamp"
 ```
