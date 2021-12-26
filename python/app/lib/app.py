@@ -16,18 +16,25 @@ class Ozbargain():
             self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
         except:
             self.__logger.debug("Could not connect to SSM, Please ensure that you have the following environment variables set: OZBARGAIN_TIMESTAMP_FILE, OZBARGAIN_SLACK_WEBHOOK and OZBARGAIN_CURL_COOKIE")
+
         try:
             self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
+        except:
+            self.slack_webhook = False
+        if self.slack_webhook:
             self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
-        except:
+        else:
             self.__logger.info(f'No Slack webhook defined.')
-        try:
-            self.discord_token = self.get_setting('OZBARGAIN_DISCORD_TOKEN')
-            self.__logger.debug(f'discord_token: {self.discord_token}')
-        except:
-            self.__logger.info(f'No Discord token defined.')
-        if not self.slack_webhook or not self.discord_webhook:
+
+        self.discord_webhook = self.get_setting('OZBARGAIN_DISCORD_WEBHOOK')
+        if self.discord_webhook:
+            self.__logger.debug(f'discord_webhook: {self.discord_webhook}')
+        else:
+            self.__logger.info(f'No Discord webhook defined.')
+
+        if not self.slack_webhook and not self.discord_webhook:
             raise Exception("No slack or discord Webhook defined in environment variables or SSM Parameters 'ozbargain_slack_webhook/ozbargain_discord_webhook'")
+
         try:
             self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
         except:
@@ -42,6 +49,7 @@ class Ozbargain():
             except:
                 raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
+        self.ozbargain_logo = "https://files.delvu.com/images/ozbargain/logo/Square.png"
         self.default_timedelta_minutes = 5
         self.namespace = {'ozb': 'https://www.ozbargain.com.au'}
 
@@ -241,12 +249,55 @@ class Ozbargain():
                 }
             ]
         }
+
         response = requests.post(
             self.slack_webhook,
             data=json.dumps(payload),
             headers={'Content-Type': 'application/json'}
         )
-        return response.status_code, response.text
+
+        return response
+
+    def post_to_discord(self, title, link, category, category_link, comments, description, image, direct_url):
+        #for all params, see https://discordapp.com/developers/docs/resources/webhook#execute-webhook
+        color = int("ff8c00", 16)
+        category_data = f'Category | {html.unescape(category)}'
+        payload = {
+            "avatar_url": self.ozbargain_logo,
+            "embeds": [
+                {
+                    "author": {
+                        "name": category_data,
+                        "url": category_link,
+                        "icon_url": image
+                    },
+                    "title": title,
+                    "description": description,
+                    "url": link,
+                    "color": color,
+                    "thumbnail": {
+                        "url": image
+                    },
+                    "fields": [
+                        {
+                            "name": "Comments",
+                            "value": comments
+                        },
+                        {
+                            "name": "Direct to Vendor",
+                            "value": direct_url
+                        }
+                    ]
+                }
+            ],
+        }
+
+        response = requests.post(
+            self.discord_webhook,
+            json=payload
+        )
+
+        return response
 
     def execute(self):
         # If the user specifies an XML file for testing, let it override grabbing the feed from ozbargain site
@@ -293,13 +344,31 @@ class Ozbargain():
             title, pub_date, link, category, category_link, comments, description, image, direct_url = self.get_deal_data(item)
             epoch_pub_date = self.get_timestamp(pub_date)
             if epoch_pub_date > last_request_timestamp:
-                response_code, response_text = self.post_to_slack(title, link, category, category_link, comments, description, image, direct_url)
-                if response_code != 200:
-                    raise Exception(f"Request to slack returned an error: {response_text}")
-                else:
-                    self.__logger.info(f"item processed successfully:\n{title}")
+                if self.slack_webhook:
+                    response = self.post_to_slack(title, link, category, category_link, comments, description, image, direct_url)
+                    if response.status_code == 200:
+                        self.__logger.info(f"Webhook to Slack successful: {title}")
+                    else:
+                        raise Exception(f"Webhook to Slack returned an error: {response.text}")
+                if self.discord_webhook:
+                    response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url)
+                    if response.status_code in [200, 204]:
+                        self.__logger.info(f"Webhook to Discord successful: {title}")
+                    elif response.status_code == 429:
+                        while response.status_code == 429:
+                            errors = json.loads(
+                                response.content.decode('utf-8'))
+                            wh_sleep = (int(errors['retry_after']) / 1000) + 0.15
+                            self.__logger.error(f"Webhook rate limited: sleeping for {wh_sleep} seconds...")
+                            time.sleep(wh_sleep)
+                            response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url)
+                            if response.status_code in [200, 204]:
+                                self.__logger.info(f"Webhook to Discord successful: {title}")
+                                break
+                    else:
+                        raise Exception(f"Webhook to Discord returned an error: {response.text}")
             else:
-                self.__logger.info(f"Breaking, as this item is up to date with last published to slack:\n{title}")
+                self.__logger.info(f"Breaking, as this item is up to date with last published: {title}")
                 break
 
         # Update timestamp with latest deal published timestamp

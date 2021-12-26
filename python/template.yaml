@@ -10,12 +10,19 @@ Parameters:
   ozbargainTimestamp:
     Type: String
     Default: "/ozbargain/timestamp"
-  ozbargainSlackWebhook:
-    Type: String
-    Default: "/ozbargain/slack_webhook"
   ozbargainCurlCookie:
     Type: String
     Default: "/ozbargain/curl_cookie"
+  # Choose either/or of these slack/discord webhooks (at least one must exist)
+  ozbargainSlackWebhook:
+    Type: String
+    Default: "/ozbargain/slack_webhook"
+  ozbargainDiscordWebhook:
+    Type: String
+    Default: "/ozbargain/discord_webhook"
+  awsRegion:
+    Type: String
+    Default: "ap-southeast-2"
 
 Globals:
   Function:
@@ -30,10 +37,13 @@ Resources:
       Handler: lambda_handler.lambda_handler
       Environment:
         Variables:
-          OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
-          OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
-          OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
           VERBOSE: !Ref verbose
+          OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
+          OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
+          AWS_REGION: !Ref awsRegion
+          # Choose either/or of these below (at least one must exist)
+          OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
+          OZBARGAIN_DISCORD_WEBHOOK_PARAMETER: !Ref ozbargainDiscordWebhook
       Events:
         ScheduledEvent:
           Type: Schedule
