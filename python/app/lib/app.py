@@ -20,7 +20,14 @@ class Ozbargain():
             self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
             self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
         except:
-            raise Exception("No slack Webhook defined in environment variable or SSM Parameter 'ozbargain_slack_webhook'")
+            self.__logger.info(f'No Slack webhook defined.')
+        try:
+            self.discord_token = self.get_setting('OZBARGAIN_DISCORD_TOKEN')
+            self.__logger.debug(f'discord_token: {self.discord_token}')
+        except:
+            self.__logger.info(f'No Discord token defined.')
+        if not self.slack_webhook or not self.discord_webhook:
+            raise Exception("No slack or discord Webhook defined in environment variables or SSM Parameters 'ozbargain_slack_webhook/ozbargain_discord_webhook'")
         try:
             self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
         except:
@@ -48,7 +55,6 @@ class Ozbargain():
     def set_timestamp_parameter_value(self, value):
         # If file exists, write timestamp to it instead of SSM param
         if self.timestamp_file:
-            self.__logger.debug(f"Timestamp file specified at: {self.timestamp_file}")
             # If file doesn't exist, let's try to create it for them
             if not os.path.isfile(self.timestamp_file):
                 self.__logger.debug("File doesn't exist, creating...")
@@ -146,9 +152,9 @@ class Ozbargain():
     def get_timestamp(self, time_to_convert):
         # Gets a string timestamp, converts it to time from epoch for ez calculations.
         converted_timestamp = datetime.strptime(time_to_convert, "%a, %d %b %Y %X %z")
-        self.__logger.debug(f'converted timestamp to datetime object for {time_to_convert}: {converted_timestamp}')
+        self.__logger.debug(f'converted timestamp to datetime object for "{time_to_convert}": {converted_timestamp}')
         epoch_timestamp = int(datetime.fromisoformat(str(converted_timestamp)).timestamp())
-        self.__logger.debug(f'timestamp since epoch for {time_to_convert}: {epoch_timestamp}')
+        self.__logger.debug(f'timestamp since epoch for "{time_to_convert}": {epoch_timestamp}')
         return epoch_timestamp
     
     def strip_items(self, strip_chars, string):
@@ -252,19 +258,25 @@ class Ozbargain():
                 raise Exception(f"XML_FILE specified in environment variables but file not accessible: {xml_file}")
         else:
             xml_file = False
-        # Let the user override the SSM Parameter timestamp if they wish
+
+        # Let the user override the timestamp if they wish
         if 'TIMESTAMP_OVERRIDE' in os.environ:
             last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
             self.__logger.debug(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         # If file is specified and exists, grab that value
-        elif os.path.isfile(self.timestamp_file):
-            with open(self.timestamp_file) as file:
-                file_contents = file.read()
-                self.__logger.debug(f"file timestamp contents: {file_contents}")
-                if not file_contents:
-                    last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
-                else:
-                    last_request_timestamp = int(file_contents)
+        elif self.timestamp_file:
+            self.__logger.debug(f"Timestamp file specified at: {self.timestamp_file}")
+            try:
+                with open(self.timestamp_file) as file:
+                    file_contents = file.read()
+                    self.__logger.debug(f"file timestamp contents: {file_contents}")
+                    if not file_contents:
+                        last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
+                    else:
+                        last_request_timestamp = int(file_contents)
+            except Exception as e:
+                self.__logger.error(f"Something went wrong grabbing the file data at {self.timestamp_file} (does the file exist yet?). Generating a timestamp...")
+                last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
         else:
             try:
                 self.__logger.info("getting timestamp from SSM...")
@@ -290,7 +302,7 @@ class Ozbargain():
                 self.__logger.info(f"Breaking, as this item is up to date with last published to slack:\n{title}")
                 break
 
-        # Update timestamp SSM param with latest deal published timestamp
+        # Update timestamp with latest deal published timestamp
         new_epoch_timestamp = self.get_timestamp(items[0].find('pubDate').text)
         if last_request_timestamp != new_epoch_timestamp:
             self.set_timestamp_parameter_value(
