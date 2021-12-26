@@ -1,8 +1,22 @@
-# Setup
+# Ozbargain Bot
 
-Obtain the slack webhook from [the slack app page here.](https://api.slack.com/apps)
+## Setup
 
-## Deploy to AWS
+### Slack
+
+Obtain the Slack webhook from the [slack app page here.](https://api.slack.com/apps)
+
+### Discord
+
+Obtain the Discord token from the [discord app page here.](https://discord.com/developers/applications)
+
+Click on your application > Go to "Bot" on the left pane > Copy "TOKEN".
+
+## Deploy
+
+Steps to deploy it to either AWS or a linux machine.
+
+### Deploy to AWS
 
 This script requires the use of AWS SSM Parameters store to store timestamp data. We'll also use SAM to deploy this.
 
@@ -23,7 +37,7 @@ sam build --use-container
 sam deploy --stack-name ozbargainbot --region ap-southeast-2 --s3-bucket <some_bucket> --capabilities CAPABILITY_IAM
 ```
 
-## Deploy to Linux Instance
+### Deploy to Linux Instance
 
 If not deploying this to AWS, hard code the values for these in the environment variables without the **_PARAMETER** suffix (you can use a file to record/get timestamp):
 
@@ -34,7 +48,7 @@ OZBARGAIN_SLACK_WEBHOOK = "https://hooks.slack.com/services/XXXXXXXXXX/XXXXXXXXX
 OZBARGAIN_TIMESTAMP_FILE: "/path/to/file/oz2slack.timestamp"
 ```
 
-## Optional Variables
+### Optional Variables
 
 The following can optionally be set depending on your use case or for testing purposes:
 
