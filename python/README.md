@@ -45,7 +45,7 @@ If not deploying this to AWS, hard code the values for these in the environment 
 # Grab this from your browser making a request to the "https://www.ozbargain.com.au/deals/" page, open up devtools and look for the Request Header "Cookie" on the main /deals/ endpoint and grab everything in that header value starting with 'PHPSESSID='.
 OZBARGAIN_CURL_COOKIE = "PHPSESSID=XXXXXXXXXXXXXX; _ga=XXXXXXXXXXXXXXX"
 OZBARGAIN_SLACK_WEBHOOK = "https://hooks.slack.com/services/XXXXXXXXXX/XXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXX"
-OZBARGAIN_TIMESTAMP_FILE: "/path/to/file/oz2slack.timestamp"
+OZBARGAIN_TIMESTAMP_FILE = "/path/to/file/oz2slack.timestamp"
 ```
 
 ### Optional Variables
