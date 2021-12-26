@@ -15,9 +15,10 @@ class Ozbargain():
         try:
             self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
         except:
-            raise Exception("Unable to connect to SSM.")
+            self.__logger.debug("Could not connect to SSM, Please ensure that you have the following environment variables set: OZBARGAIN_TIMESTAMP_FILE, OZBARGAIN_SLACK_WEBHOOK and OZBARGAIN_CURL_COOKIE")
         try:
             self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
+            self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
         except:
             raise Exception("No slack Webhook defined in environment variable or SSM Parameter 'ozbargain_slack_webhook'")
         try:
@@ -26,14 +27,13 @@ class Ozbargain():
             raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
         try:
             # Try to get the SSM parameter
-            self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
+            self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP')
         except:
             try:
                 # Try to get the file path instead
-                self.timestamp_file = self.get_setting('TIMESTAMP_FILE')
+                self.timestamp_file = self.get_setting('OZBARGAIN_TIMESTAMP_FILE')
             except:
-                raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
-        self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
+                raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
         self.default_timedelta_minutes = 5
         self.namespace = {'ozb': 'https://www.ozbargain.com.au'}
@@ -129,7 +129,6 @@ class Ozbargain():
         description = self.strip_items(strip_items_other, description)
         self.__logger.debug(f'description: {description}')
         # The rest of the data is in the ozb:meta namespace in XML
-
         try:
             image = item.find('ozb:meta', self.namespace).attrib['image']
             image = self.strip_items(strip_items_other, image)
@@ -269,7 +268,7 @@ class Ozbargain():
         else:
             try:
                 self.__logger.info("getting timestamp from SSM...")
-                last_request_timestamp = int(self.get_setting('ozbargain_timestamp'))
+                last_request_timestamp = int(self.timestamp_parameter)
             except Exception as e:
                 self.__logger.error(f"unable to obtain last published timestamp from SSM, generating one... error: {e}")
                 last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
