@@ -159,7 +159,7 @@ class Ozbargain():
             string = string.replace(item, '')
         return string
 
-    def ready_payload(self, title, link, category, category_link, comments, description, image, direct_url):
+    def post_to_slack(self, title, link, category, category_link, comments, description, image, direct_url):
         self.__logger.info(f"Readying payload for item: '{title}'")
         # Gotta transform some data to load it into the json to look pretty in slack
         category_data = f"Category | <{category_link}|*{category}*>"
@@ -236,9 +236,6 @@ class Ozbargain():
                 }
             ]
         }
-        return payload
-
-    def post_to_slack(self, payload):
         response = requests.post(
             self.slack_webhook,
             data=json.dumps(payload),
@@ -285,8 +282,7 @@ class Ozbargain():
             title, pub_date, link, category, category_link, comments, description, image, direct_url = self.get_deal_data(item)
             epoch_pub_date = self.get_timestamp(pub_date)
             if epoch_pub_date > last_request_timestamp:
-                payload = self.ready_payload(title, link, category, category_link, comments, description, image, direct_url)
-                response_code, response_text = self.post_to_slack(payload)
+                response_code, response_text = self.post_to_slack(title, link, category, category_link, comments, description, image, direct_url)
                 if response_code != 200:
                     raise Exception(f"Request to slack returned an error: {response_text}")
                 else:
