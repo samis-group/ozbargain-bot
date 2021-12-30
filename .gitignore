@@ -3,5 +3,5 @@ php/failed.txt
 php/ozb.xml
 php/ozxml.xml
 php/pubdate.txt
-.aws-sam/*
+**.aws-sam
 **.env

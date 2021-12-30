@@ -6,10 +6,14 @@ class Logger:
         self.__formatter = ColoredFormatter() if coloured else StandardFormatter()
 
     def get_logger(self, verbose=True, name='ozbargainbot'):
+        # Get rid of the default AWS logger
+        root = logging.getLogger()
+        if root.handlers:
+            for handler in root.handlers:
+                root.removeHandler(handler)
+        # Create our own
         log_level = logging.DEBUG if verbose else logging.INFO
         logger = logging.getLogger(name)
-        if (logger.hasHandlers()):
-            logger.handlers.clear()
         handler = logging.StreamHandler()
         handler.setLevel(log_level)
         handler.setFormatter(self.__formatter)
@@ -17,8 +21,10 @@ class Logger:
         logger.setLevel(log_level)
         # Silence the noisy boto loggers...
         boto_and_friends_logging_level = logging.INFO if verbose else logging.WARN
-        for logger_name in ['boto', 'botocore', 'boto3', 'nose', 'urllib3', 's3transfer']:
-            logging.getLogger(logger_name).setLevel(boto_and_friends_logging_level)
+        boto_logger_names = ['boto', 'botocore', 'boto3', 'nose', 'urllib3', 's3transfer']
+        for handler in logger.handlers:
+            if handler.name in boto_logger_names:
+                handler.setLevel(boto_and_friends_logging_level)
         return logger
 
 class StandardFormatter(logging.Formatter):

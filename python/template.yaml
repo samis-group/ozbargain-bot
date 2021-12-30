@@ -20,7 +20,7 @@ Parameters:
   ozbargainDiscordWebhook:
     Type: String
     Default: "/ozbargain/discord_webhook"
-  awsRegion:
+  ozbargainAwsRegion:
     Type: String
     Default: "ap-southeast-2"
 
@@ -40,7 +40,7 @@ Resources:
           VERBOSE: !Ref verbose
           OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
           OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
-          AWS_REGION: !Ref awsRegion
+          OZBARGAIN_AWS_REGION: !Ref ozbargainAwsRegion
           # Choose either/or of these below (at least one must exist)
           OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
           OZBARGAIN_DISCORD_WEBHOOK_PARAMETER: !Ref ozbargainDiscordWebhook
@@ -50,7 +50,7 @@ Resources:
           Properties:
             Description: Run every minute
             Enabled: True
-            Schedule: 'rate(1 minute)'
+            Schedule: 'rate(5 minutes)'
       Policies:
         - Statement:
             - Sid: SSMGetParametersPolicy

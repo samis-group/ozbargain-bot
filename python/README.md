@@ -30,7 +30,7 @@ OZBARGAIN_CURL_COOKIE_PARAMETER = "/ozbargain/curl_cookie"
 OZBARGAIN_SLACK_WEBHOOK_PARAMETER= "/ozbargain/slack_webhook"
 OZBARGAIN_DISCORD_WEBHOOK_PARAMETER= "/ozbargain/discord_webhook"
 OZBARGAIN_TIMESTAMP_PARAMETER = "/ozbargain/timestamp"
-AWS_REGION = "ap-southeast-2"
+OZBARGAIN_AWS_REGION = "ap-southeast-2"
 ```
 
 The [template.yaml](template.yaml) file is configured to deploy the above environment variables for you. Change as desired.
@@ -38,6 +38,10 @@ The [template.yaml](template.yaml) file is configured to deploy the above enviro
 Now let's build and deploy the app (*Replace `some_bucket` with a bucket of your choosing*):
 
 ```shell
+# First specify the credentials you will be using if it is not "default" (ensure aws cli is setup and/or tokens are generated):
+export AWS_PROFILE="PROFILE_NAME"
+
+# Now build and deploy the image
 sam build --use-container
 sam deploy --stack-name ozbargainbot --region ap-southeast-2 --s3-bucket <some_bucket> --capabilities CAPABILITY_IAM
 ```
@@ -62,4 +66,5 @@ The following can optionally be set depending on your use case or for testing pu
 VERBOSE = "true"
 XML_FILE = "/path/to/file/feed"     # Specify an optional path to an xml file you want to load for testing. Leave blank if you want to hit ozbargain feed.
 TIMESTAMP_OVERRIDE = "1"    # If you want to override the timestamp that is set and get in ssm parameter.
+AWS_PROFILE = "default"     # Set the AWS profile that you want to use for the SSM calls.
 ```

@@ -1,21 +1,40 @@
 from datetime import datetime, timedelta
 import time
-import boto3
 import requests
 import json
 import os
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 import html
+import boto3
 
 class Ozbargain():
     def __init__(self, logger) -> None:
         self.__logger = logger
+        self.timestamp_file = None
+        self.timestamp_parameter_key = None
+        self.aws_profile = None
+        self.aws_region = None
+        self.aws_session = None
+
         # Do some validation for required params
         try:
-            self.ssm = boto3.client('ssm', region_name=os.environ['AWS_REGION'])
-        except:
-            self.__logger.debug("Could not connect to SSM, Please ensure that you have the following environment variables set: OZBARGAIN_TIMESTAMP_FILE, OZBARGAIN_SLACK_WEBHOOK and OZBARGAIN_CURL_COOKIE")
+            self.aws_region = os.environ['OZBARGAIN_AWS_REGION']
+            if self.aws_region:
+                # Gotta do some AWS stuff so we can specify account/region while testing.
+                try:
+                    self.aws_profile = os.environ['AWS_PROFILE']
+                    self.aws_session = boto3.Session(region_name=self.aws_region, profile_name=self.aws_profile)
+                    self.ssm = self.aws_session.client('ssm', region_name=self.aws_region)
+                except Exception as e:
+                    self.__logger.debug(f"Could not create a session using a custom profile, trying 'default' profile... Error: {repr(e)}")
+                    try:
+                        self.ssm = boto3.client('ssm', region_name=self.aws_region)
+                    except Exception as e:
+                        self.__logger.debug(f"Could not connect to SSM. Please ensure 'AWS_PROFILE' and 'OZBARGAIN_AWS_REGION' environment variables exist and are correct. Error: {repr(e)}")
+                        self.__logger.debug("Continuing with file setup, please ensure that you have the following environment variables set: OZBARGAIN_TIMESTAMP_FILE, OZBARGAIN_(SLACK/DISCORD)_WEBHOOK and OZBARGAIN_CURL_COOKIE")
+        except Exception as e:
+            self.__logger.warning(f"No 'OZBARGAIN_AWS_REGION' environment variable set, this means SSM won't work. This is fine if using files or env variables for values. Error: {repr(e)}")
 
         try:
             self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
@@ -24,13 +43,16 @@ class Ozbargain():
         if self.slack_webhook:
             self.__logger.debug(f'slack_webhook url: {self.slack_webhook}')
         else:
-            self.__logger.info(f'No Slack webhook defined.')
+            self.__logger.debug(f'No Slack webhook defined.')
 
-        self.discord_webhook = self.get_setting('OZBARGAIN_DISCORD_WEBHOOK')
+        try:
+            self.discord_webhook = self.get_setting('OZBARGAIN_DISCORD_WEBHOOK')
+        except:
+            self.discord_webhook = False
         if self.discord_webhook:
             self.__logger.debug(f'discord_webhook: {self.discord_webhook}')
         else:
-            self.__logger.info(f'No Discord webhook defined.')
+            self.__logger.debug(f'No Discord webhook defined.')
 
         if not self.slack_webhook and not self.discord_webhook:
             raise Exception("No slack or discord Webhook defined in environment variables or SSM Parameters 'ozbargain_slack_webhook/ozbargain_discord_webhook'")
@@ -40,8 +62,9 @@ class Ozbargain():
         except:
             raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
         try:
-            # Try to get the SSM parameter
-            self.timestamp_parameter = self.get_setting('OZBARGAIN_TIMESTAMP')
+            # Try to get the SSM parameter key and value
+            self.timestamp_parameter_key = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
+            self.timestamp_parameter_value = self.get_setting('OZBARGAIN_TIMESTAMP')
         except:
             try:
                 # Try to get the file path instead
@@ -73,16 +96,18 @@ class Ozbargain():
         else:
             try:
                 self.ssm.put_parameter(
-                    Name=self.timestamp_parameter,
+                    Name=self.timestamp_parameter_key,
                     Value=str(value),
                     Type='String',
                     Overwrite=True
                 )
             except Exception as e:
                 self.__logger.error(f"Error setting param in SSM: {e}")
-            self.__logger.info(f"Updated SSM parameter '{self.timestamp_parameter}' to '{value}'.")
+            self.__logger.info(f"Successfully updated SSM parameter '{self.timestamp_parameter_key}' to '{value}'.")
 
     def get_setting(self, setting_name):
+        # This function will attempt to find the value of the 'setting_name' passed to it in either the environment variables
+        # or will add a "_PARAMETER" suffix and attempt to get the VALUE of the parameter from SSM (not the key in the env).
         env_var = setting_name.upper()
         param_path = f'{env_var}_PARAMETER'
         if env_var in os.environ:
@@ -93,7 +118,7 @@ class Ozbargain():
             raise Exception(f"You must specify either {env_var} or {param_path}")
 
     def get_xml_tree(self, xml_file=False):
-        self.__logger.info("Getting XML Tree...")
+        self.__logger.debug("Getting XML Tree...")
         if xml_file:
             with open(xml_file, 'r') as file:
                 xml_feed = file.read()
@@ -173,7 +198,7 @@ class Ozbargain():
         return string
 
     def post_to_slack(self, title, link, category, category_link, comments, description, image, direct_url):
-        self.__logger.info(f"Readying payload for item: '{title}'")
+        self.__logger.debug(f"Posting item to Slack.")
         # Gotta transform some data to load it into the json to look pretty in slack
         category_data = f"Category | <{category_link}|*{category}*>"
         link_and_title = f"<{link}|*{title}*>"
@@ -259,7 +284,8 @@ class Ozbargain():
         return response
 
     def post_to_discord(self, title, link, category, category_link, comments, description, image, direct_url):
-        #for all params, see https://discordapp.com/developers/docs/resources/webhook#execute-webhook
+        self.__logger.debug(f"Posting item to Discord.")
+        # for all params, see https://discordapp.com/developers/docs/resources/webhook#execute-webhook
         color = int("ff8c00", 16)
         category_data = f'Category | {html.unescape(category)}'
         payload = {
@@ -304,7 +330,7 @@ class Ozbargain():
         if 'XML_FILE' in os.environ:
             xml_file = self.get_setting('XML_FILE')
             if os.path.isfile(xml_file):
-                self.__logger.debug(f"XML_FILE found at: {xml_file}")
+                self.__logger.warning(f"Using XML file found at: {xml_file}")
             else:
                 raise Exception(f"XML_FILE specified in environment variables but file not accessible: {xml_file}")
         else:
@@ -313,62 +339,62 @@ class Ozbargain():
         # Let the user override the timestamp if they wish
         if 'TIMESTAMP_OVERRIDE' in os.environ:
             last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
-            self.__logger.debug(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
+            self.__logger.warning(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         # If file is specified and exists, grab that value
         elif self.timestamp_file:
             self.__logger.debug(f"Timestamp file specified at: {self.timestamp_file}")
             try:
                 with open(self.timestamp_file) as file:
                     file_contents = file.read()
-                    self.__logger.debug(f"file timestamp contents: {file_contents}")
+                    self.__logger.info(f"Current timestamp from file: {file_contents}")
                     if not file_contents:
                         last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
                     else:
                         last_request_timestamp = int(file_contents)
             except Exception as e:
-                self.__logger.error(f"Something went wrong grabbing the file data at {self.timestamp_file} (does the file exist yet?). Generating a timestamp...")
+                self.__logger.error(f"Something went wrong grabbing the file data at {self.timestamp_file} (does the file exist yet?). Generating a timestamp (-{self.default_timedelta_minutes} minutes from now)...")
                 last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
         else:
             try:
-                self.__logger.info("getting timestamp from SSM...")
-                last_request_timestamp = int(self.timestamp_parameter)
+                last_request_timestamp = int(self.timestamp_parameter_value)
+                self.__logger.info(f"Current timestamp from SSM: {last_request_timestamp}")
             except Exception as e:
-                self.__logger.error(f"unable to obtain last published timestamp from SSM, generating one... error: {e}")
+                self.__logger.error(f"unable to obtain last published timestamp from SSM, Generating a timestamp (-{self.default_timedelta_minutes} minutes from now)... error: {e}")
                 last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
-        self.__logger.debug(f"last_request_timestamp: {last_request_timestamp}")
 
         xml_tree = self.get_xml_tree(xml_file)
         channel = xml_tree.find('channel')
         items = list(channel.iterfind('item'))
         for item in items:
             title, pub_date, link, category, category_link, comments, description, image, direct_url = self.get_deal_data(item)
+            self.__logger.info(f"Processing item: {title}")
             epoch_pub_date = self.get_timestamp(pub_date)
             if epoch_pub_date > last_request_timestamp:
                 if self.slack_webhook:
                     response = self.post_to_slack(title, link, category, category_link, comments, description, image, direct_url)
                     if response.status_code == 200:
-                        self.__logger.info(f"Webhook to Slack successful: {title}")
+                        self.__logger.info(f"Webhook to Slack successful.")
                     else:
                         raise Exception(f"Webhook to Slack returned an error: {response.text}")
                 if self.discord_webhook:
                     response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url)
                     if response.status_code in [200, 204]:
-                        self.__logger.info(f"Webhook to Discord successful: {title}")
+                        self.__logger.info(f"Webhook to Discord successful.")
                     elif response.status_code == 429:
                         while response.status_code == 429:
                             errors = json.loads(
                                 response.content.decode('utf-8'))
                             wh_sleep = (int(errors['retry_after']) / 1000) + 0.15
-                            self.__logger.error(f"Webhook rate limited: sleeping for {wh_sleep} seconds...")
+                            self.__logger.warning(f"Webhook rate limited: sleeping for {wh_sleep} seconds...")
                             time.sleep(wh_sleep)
                             response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url)
                             if response.status_code in [200, 204]:
-                                self.__logger.info(f"Webhook to Discord successful: {title}")
+                                self.__logger.info(f"Webhook to Discord successful.")
                                 break
                     else:
                         raise Exception(f"Webhook to Discord returned an error: {response.text}")
             else:
-                self.__logger.info(f"Breaking, as this item is up to date with last published: {title}")
+                self.__logger.info(f"Breaking, as this item is up to date with last published item.")
                 break
 
         # Update timestamp with latest deal published timestamp
@@ -378,4 +404,4 @@ class Ozbargain():
                 value=new_epoch_timestamp
             )
         else:
-            self.__logger.debug(f"Latest deal already published to slack.")
+            self.__logger.info(f"Latest deal already published to slack, no timestamp to update.")
