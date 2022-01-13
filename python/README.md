@@ -21,8 +21,8 @@ AWS Environment variables will look like this as the value points to an SSM para
 ```shell
 # Grab this from your browser making a request to the "https://www.ozbargain.com.au/deals/" page, open up devtools and look for the Request Header "Cookie" on the main /deals/ endpoint and grab everything in that header value starting with 'PHPSESSID='.
 OZBARGAIN_CURL_COOKIE_PARAMETER = "/ozbargain/curl_cookie"
-OZBARGAIN_SLACK_WEBHOOK_PARAMETER= "/ozbargain/slack_webhook"
-OZBARGAIN_DISCORD_WEBHOOK_PARAMETER= "/ozbargain/discord_webhook"
+OZBARGAIN_SLACK_WEBHOOK_PARAMETER = "/ozbargain/slack_webhook"
+OZBARGAIN_DISCORD_WEBHOOK_PARAMETER = "/ozbargain/discord_webhook"
 OZBARGAIN_TIMESTAMP_PARAMETER = "/ozbargain/timestamp"
 OZBARGAIN_AWS_REGION = "ap-southeast-2"
 ```
