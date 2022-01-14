@@ -108,7 +108,7 @@ class Ozbargain():
             except:
                 pass
 
-        if not self.timestamp_parameter_key or not self.timestamp_file or not self.timestamp_parameter_key_frontpage or not self.timestamp_file_frontpage:
+        if not self.timestamp_parameter_key and not self.timestamp_file and not self.timestamp_parameter_key_frontpage and not self.timestamp_file_frontpage:
             raise Exception("No OZBARGAIN_TIMESTAMP_(FRONTPAGE_)PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
 
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
@@ -467,6 +467,7 @@ class Ozbargain():
         # Let the user override the timestamp if they wish - We want this behaviour to override both frontpage and deals
         if 'TIMESTAMP_OVERRIDE' in os.environ:
             last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
+            last_request_timestamp_frontpage = int(self.get_setting('TIMESTAMP_OVERRIDE'))
             self.__logger.warning(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         else:
             last_request_timestamp = self.get_last_request_timestamp(timestamp_file=self.timestamp_file, timestamp_parameter=self.timestamp_parameter_value)
