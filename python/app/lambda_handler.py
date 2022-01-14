@@ -3,7 +3,7 @@ from lib.app import Ozbargain
 from lib.logger import Logger
 
 def lambda_handler(event, context):
-    verbose = os.environ.get('VERBOSE', 'false').lower() == 'true'
+    verbose = os.environ.get('OZBARGAIN_VERBOSE', 'false').lower() == 'true'
     logger = Logger(coloured=False).get_logger(verbose)
     try:
         ozbargain = Ozbargain(logger)
@@ -18,7 +18,7 @@ def lambda_handler(event, context):
 
 # Local testing - invoke the script directly
 if __name__ == "__main__":
-    verbose = os.environ.get('VERBOSE', 'false').lower() == 'true'
+    verbose = os.environ.get('OZBARGAIN_VERBOSE', 'false').lower() == 'true'
     logger = Logger().get_logger(verbose)
     ozbargain = Ozbargain(logger)
     ozbargain.execute()

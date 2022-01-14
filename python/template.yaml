@@ -10,16 +10,22 @@ Parameters:
   ozbargainTimestamp:
     Type: String
     Default: "/ozbargain/timestamp"
-  ozbargainCurlCookie:
+  ozbargainTimestampFrontpage:
     Type: String
-    Default: "/ozbargain/curl_cookie"
-  # Choose either/or of these slack/discord webhooks (at least one must exist)
+    Default: "/ozbargain/timestamp_frontpage"
+  # Choose any webhooks from these slack/discord webhooks below (at least one must exist)
   ozbargainSlackWebhook:
     Type: String
     Default: "/ozbargain/slack_webhook"
+  ozbargainSlackWebhookFrontpage:
+    Type: String
+    Default: "/ozbargain/slack_webhook_frontpage"
   ozbargainDiscordWebhook:
     Type: String
     Default: "/ozbargain/discord_webhook"
+  ozbargainDiscordWebhookFrontpage:
+    Type: String
+    Default: "/ozbargain/discord_webhook_frontpage"
   ozbargainAwsRegion:
     Type: String
     Default: "ap-southeast-2"
@@ -39,11 +45,14 @@ Resources:
         Variables:
           VERBOSE: !Ref verbose
           OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
+          OZBARGAIN_TIMESTAMP_FRONTPAGE_PARAMETER: !Ref ozbargainTimestampFrontpage
           OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
           OZBARGAIN_AWS_REGION: !Ref ozbargainAwsRegion
-          # Choose either/or of these below (at least one must exist)
+          # Choose any of these webhooks below to post to (at least one must exist)
           OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
+          OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE_PARAMETER: !Ref ozbargainSlackWebhookFrontpage
           OZBARGAIN_DISCORD_WEBHOOK_PARAMETER: !Ref ozbargainDiscordWebhook
+          OZBARGAIN_DISCORD_WEBHOOK_FRONTPAGE_PARAMETER: !Ref ozbargainDiscordWebhookFrontpage
       Events:
         ScheduledEvent:
           Type: Schedule

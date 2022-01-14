@@ -29,15 +29,15 @@ class Ozbargain():
             if self.aws_region:
                 # Gotta do some AWS stuff so we can specify account/region while testing.
                 try:
-                    self.aws_profile = os.environ['AWS_PROFILE']
+                    self.aws_profile = os.environ['OZBARGAIN_AWS_PROFILE']
                     self.aws_session = boto3.Session(region_name=self.aws_region, profile_name=self.aws_profile)
                     self.ssm = self.aws_session.client('ssm', region_name=self.aws_region)
                 except Exception as e:
-                    self.__logger.debug(f"Could not create a session using a custom profile, trying 'default' profile... Error: {repr(e)}")
+                    self.__logger.debug(f"Could not create a session using specified profile '{self.aws_profile}', trying 'default' profile... Error: {repr(e)}")
                     try:
                         self.ssm = boto3.client('ssm', region_name=self.aws_region)
                     except Exception as e:
-                        self.__logger.debug(f"Could not connect to SSM. Please ensure 'AWS_PROFILE' and 'OZBARGAIN_AWS_REGION' environment variables exist and are correct. Error: {repr(e)}")
+                        self.__logger.debug(f"Could not connect to SSM. Please ensure 'OZBARGAIN_AWS_PROFILE' and 'OZBARGAIN_AWS_REGION' environment variables exist and are correct. Error: {repr(e)}")
                         self.__logger.debug("Continuing with file setup, please ensure that you have the correct environment variables set.")
         except Exception as e:
             self.__logger.warning(f"No 'OZBARGAIN_AWS_REGION' environment variable set, this means SSM won't work. This is fine if using files or env variables for values. Error: {repr(e)}")
@@ -53,7 +53,8 @@ class Ozbargain():
 
         try:
             self.slack_webhook_frontpage = self.get_setting('OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE')
-        except:
+        except Exception as e:
+            self.__logger.debug(f'error: {repr(e)}')
             self.slack_webhook_frontpage = False
         if self.slack_webhook_frontpage:
             self.__logger.debug(f'slack_webhook_frontpage url: {self.slack_webhook_frontpage}')
@@ -80,11 +81,6 @@ class Ozbargain():
 
         if not self.slack_webhook and not self.discord_webhook and not self.slack_webhook_frontpage and not self.discord_webhook_frontpage:
             raise Exception("No slack, slack_frontpage, discord or discord_frontpage Webhooks defined in environment variables or SSM Parameters 'OZBARGAIN_SLACK_WEBHOOK/OZBARGAIN_DISCORD_WEBHOOK/OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE/OZBARGAIN_DISCORD_WEBHOOK_FRONTPAGE'")
-
-        try:
-            self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
-        except:
-            raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
 
         try:
             # Try to get the SSM parameter key and value for new deal data
@@ -166,7 +162,7 @@ class Ozbargain():
         else:
             try:
                 last_request_timestamp = int(timestamp_parameter)
-                self.__logger.info(f"Current timestamp from SSM: {last_request_timestamp}")
+                self.__logger.info(f"Obtained timestamp from SSM: {last_request_timestamp}")
             except Exception as e:
                 # If not file/ssm, we just take 5 mins off current time and assume deals posted since last cron runtime (assuming cron is set to 5? It better be...)
                 self.__logger.error(f"unable to obtain last published timestamp from SSM, Generating a timestamp (-{self.default_timedelta_minutes} minutes from now)... error: {e}")
@@ -193,13 +189,11 @@ class Ozbargain():
         else:
             headers = {}
             headers['cache-control'] = "max-age=0"
-            headers['cookie'] = f"G_ENABLED_IDPS=google; PHPSESSID={self.curl_cookie}"
             xml_feed = requests.get(url, headers=headers).content
         xml_tree = ET.fromstring(xml_feed)
         return xml_tree
 
     def process_data(self, xml_tree, last_request_timestamp, slack_webhook=None, discord_webhook=None, slack_webhook_frontpage=None, discord_webhook_frontpage=None):
-        self.__logger.debug(f"Processing Deals...")
         channel = xml_tree.find('channel')
         items = list(channel.iterfind('item'))
         for item in items:
@@ -229,7 +223,7 @@ class Ozbargain():
                             wh_sleep = (int(errors['retry_after']) / 1000) + 0.15
                             self.__logger.warning(f"Webhook rate limited: sleeping for {wh_sleep} seconds...")
                             time.sleep(wh_sleep)
-                            response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url)
+                            response = self.post_to_discord(title, link, category, category_link, comments, description, image, direct_url, discord_webhook)
                             if response.status_code in [200, 204]:
                                 self.__logger.info(f"Webhook to Discord successful.")
                                 break
@@ -454,29 +448,39 @@ class Ozbargain():
         return response
 
     def execute(self):
+        xml_file = None
+        xml_file_frontpage = None
         # If the user specifies an XML file for testing, let it override grabbing the feed from ozbargain site
-        if 'XML_FILE' in os.environ:
-            xml_file = self.get_setting('XML_FILE')
+        if 'OZBARGAIN_XML_FILE' in os.environ:
+            xml_file = self.get_setting('OZBARGAIN_XML_FILE')
             if os.path.isfile(xml_file):
-                self.__logger.warning(f"Using XML file found at: {xml_file}")
+                self.__logger.warning(f"Using Deals XML file found at: {xml_file}")
             else:
-                raise Exception(f"XML_FILE specified in environment variables but file not accessible: {xml_file}")
-        else:
-            xml_file = False
+                raise Exception(f"OZBARGAIN_XML_FILE specified in environment variables but file not accessible: {xml_file}")
+        elif 'OZBARGAIN_XML_FILE_FRONTPAGE' in os.environ:
+            xml_file_frontpage = self.get_setting('OZBARGAIN_XML_FILE_FRONTPAGE')
+            if os.path.isfile(xml_file_frontpage):
+                self.__logger.warning(f"Using Frontpage XML file found at: {xml_file_frontpage}")
+            else:
+                raise Exception(f"OZBARGAIN_XML_FILE_FRONTPAGE specified in environment variables but file not accessible: {xml_file_frontpage}")
 
         # Let the user override the timestamp if they wish - We want this behaviour to override both frontpage and deals
-        if 'TIMESTAMP_OVERRIDE' in os.environ:
-            last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
-            last_request_timestamp_frontpage = int(self.get_setting('TIMESTAMP_OVERRIDE'))
-            self.__logger.warning(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
+        if 'OZBARGAIN_TIMESTAMP_OVERRIDE' in os.environ:
+            last_request_timestamp = int(self.get_setting('OZBARGAIN_TIMESTAMP_OVERRIDE'))
+            last_request_timestamp_frontpage = int(self.get_setting('OZBARGAIN_TIMESTAMP_OVERRIDE'))
+            self.__logger.warning(f"OZBARGAIN_TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         else:
+            self.__logger.debug("Obtaining Deals timestamp...")
             last_request_timestamp = self.get_last_request_timestamp(timestamp_file=self.timestamp_file, timestamp_parameter=self.timestamp_parameter_value)
+            self.__logger.debug("Obtaining Frontpage timestamp...")
             last_request_timestamp_frontpage = self.get_last_request_timestamp(timestamp_file=self.timestamp_file_frontpage, timestamp_parameter=self.timestamp_parameter_value_frontpage)
 
         if self.slack_webhook or self.discord_webhook:
+            self.__logger.info("Processing Deals data!")
             xml_tree = self.get_xml_tree(self.ozbargain_feed_url, xml_file)
             self.process_data(xml_tree, last_request_timestamp, slack_webhook=self.slack_webhook, discord_webhook=self.discord_webhook)
 
         if self.slack_webhook_frontpage or self.discord_webhook_frontpage:
-            xml_tree_frontpage = self.get_xml_tree(self.ozbargain_frontpage_feed_url, xml_file)
+            self.__logger.info("Processing Frontpage data!")
+            xml_tree_frontpage = self.get_xml_tree(self.ozbargain_frontpage_feed_url, xml_file_frontpage)
             self.process_data(xml_tree_frontpage, last_request_timestamp_frontpage, slack_webhook_frontpage=self.slack_webhook_frontpage, discord_webhook_frontpage=self.discord_webhook_frontpage)
