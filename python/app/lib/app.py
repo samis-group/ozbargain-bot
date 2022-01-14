@@ -470,17 +470,17 @@ class Ozbargain():
             last_request_timestamp_frontpage = int(self.get_setting('OZBARGAIN_TIMESTAMP_OVERRIDE'))
             self.__logger.warning(f"OZBARGAIN_TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         else:
-            self.__logger.debug("Obtaining Deals timestamp...")
+            self.__logger.info(">>> Obtaining Deals timestamp...")
             last_request_timestamp = self.get_last_request_timestamp(timestamp_file=self.timestamp_file, timestamp_parameter=self.timestamp_parameter_value)
-            self.__logger.debug("Obtaining Frontpage timestamp...")
+            self.__logger.info(">>> Obtaining Frontpage timestamp...")
             last_request_timestamp_frontpage = self.get_last_request_timestamp(timestamp_file=self.timestamp_file_frontpage, timestamp_parameter=self.timestamp_parameter_value_frontpage)
 
         if self.slack_webhook or self.discord_webhook:
-            self.__logger.info("Processing Deals data!")
+            self.__logger.info(">>> Processing Deals data...")
             xml_tree = self.get_xml_tree(self.ozbargain_feed_url, xml_file)
             self.process_data(xml_tree, last_request_timestamp, slack_webhook=self.slack_webhook, discord_webhook=self.discord_webhook)
 
         if self.slack_webhook_frontpage or self.discord_webhook_frontpage:
-            self.__logger.info("Processing Frontpage data!")
+            self.__logger.info(">>> Processing Frontpage data...")
             xml_tree_frontpage = self.get_xml_tree(self.ozbargain_frontpage_feed_url, xml_file_frontpage)
             self.process_data(xml_tree_frontpage, last_request_timestamp_frontpage, slack_webhook_frontpage=self.slack_webhook_frontpage, discord_webhook_frontpage=self.discord_webhook_frontpage)

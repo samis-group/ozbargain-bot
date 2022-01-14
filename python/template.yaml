@@ -3,10 +3,13 @@ Transform: AWS::Serverless-2016-10-31
 Description: ozbargainbot
 
 Parameters:
-  verbose:
+  ozbargainVerbose:
     Type: String
     Default: "false"
-  # Make sure the following exist in SSM Parameter store
+  ozbargainAwsRegion:
+    Type: String
+    Default: "ap-southeast-2"
+  # Make sure the rest of these parameters exist in SSM Parameter store
   ozbargainTimestamp:
     Type: String
     Default: "/ozbargain/timestamp"
@@ -26,9 +29,6 @@ Parameters:
   ozbargainDiscordWebhookFrontpage:
     Type: String
     Default: "/ozbargain/discord_webhook_frontpage"
-  ozbargainAwsRegion:
-    Type: String
-    Default: "ap-southeast-2"
 
 Globals:
   Function:
@@ -43,10 +43,9 @@ Resources:
       Handler: lambda_handler.lambda_handler
       Environment:
         Variables:
-          VERBOSE: !Ref verbose
+          OZBARGAIN_VERBOSE: !Ref ozbargainVerbose
           OZBARGAIN_TIMESTAMP_PARAMETER: !Ref ozbargainTimestamp
           OZBARGAIN_TIMESTAMP_FRONTPAGE_PARAMETER: !Ref ozbargainTimestampFrontpage
-          OZBARGAIN_CURL_COOKIE_PARAMETER: !Ref ozbargainCurlCookie
           OZBARGAIN_AWS_REGION: !Ref ozbargainAwsRegion
           # Choose any of these webhooks below to post to (at least one must exist)
           OZBARGAIN_SLACK_WEBHOOK_PARAMETER: !Ref ozbargainSlackWebhook
