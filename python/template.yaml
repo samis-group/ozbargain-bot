@@ -56,7 +56,7 @@ Resources:
         ScheduledEvent:
           Type: Schedule
           Properties:
-            Description: Run every minute
+            Description: Run every 5 minutes
             Enabled: True
             Schedule: 'rate(5 minutes)'
       Policies:
