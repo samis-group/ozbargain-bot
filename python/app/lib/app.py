@@ -78,8 +78,8 @@ class Ozbargain():
         else:
             self.__logger.debug(f'No Discord Frontpage webhook defined.')
 
-        if not self.slack_webhook and not self.discord_webhook and not self.slack_webhook_frontpage and not self.discord_frontpage_webhook:
-            raise Exception("No slack, slack_frontpage, discord or discord_frontpage Webhooks defined in environment variables or SSM Parameters 'OZBARGAIN_SLACK_WEBHOOK/OZBARGAIN_DISCORD_WEBHOOK/OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE/OZBARGAIN_DISCORD_FRONTPAGE_WEBHOOK'")
+        if not self.slack_webhook and not self.discord_webhook and not self.slack_webhook_frontpage and not self.discord_webhook_frontpage:
+            raise Exception("No slack, slack_frontpage, discord or discord_frontpage Webhooks defined in environment variables or SSM Parameters 'OZBARGAIN_SLACK_WEBHOOK/OZBARGAIN_DISCORD_WEBHOOK/OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE/OZBARGAIN_DISCORD_WEBHOOK_FRONTPAGE'")
 
         try:
             self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
@@ -476,6 +476,6 @@ class Ozbargain():
             xml_tree = self.get_xml_tree(self.ozbargain_feed_url, xml_file)
             self.process_data(xml_tree, last_request_timestamp, slack_webhook=self.slack_webhook, discord_webhook=self.discord_webhook)
 
-        if self.slack_webhook_frontpage or self.discord_frontpage_webhook:
+        if self.slack_webhook_frontpage or self.discord_webhook_frontpage:
             xml_tree_frontpage = self.get_xml_tree(self.ozbargain_frontpage_feed_url, xml_file)
             self.process_data(xml_tree_frontpage, last_request_timestamp_frontpage, slack_webhook_frontpage=self.slack_webhook_frontpage, discord_webhook_frontpage=self.discord_webhook_frontpage)
