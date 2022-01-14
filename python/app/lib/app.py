@@ -13,8 +13,10 @@ class Ozbargain():
         self.__logger = logger
         self.timestamp_file = None
         self.timestamp_parameter_key = None
+        self.timestamp_parameter_value = None
         self.timestamp_file_frontpage = None
         self.timestamp_parameter_key_frontpage = None
+        self.timestamp_parameter_value_frontpage = None
         self.aws_profile = None
         self.aws_region = None
         self.aws_session = None
@@ -83,8 +85,9 @@ class Ozbargain():
             self.curl_cookie = self.get_setting('OZBARGAIN_CURL_COOKIE')
         except:
             raise Exception("Unable to locate required curl cookie in environment variable or SSM Parameter 'ozbargain_curl_cookie'.")
+
         try:
-            # Try to get the SSM parameter key and value
+            # Try to get the SSM parameter key and value for new deal data
             self.timestamp_parameter_key = self.get_setting('OZBARGAIN_TIMESTAMP_PARAMETER')
             self.timestamp_parameter_value = self.get_setting('OZBARGAIN_TIMESTAMP')
         except:
@@ -92,10 +95,10 @@ class Ozbargain():
                 # Try to get the file path instead
                 self.timestamp_file = self.get_setting('OZBARGAIN_TIMESTAMP_FILE')
             except:
-                raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
+                pass
 
         try:
-            # Try to get the SSM parameter key and value
+            # Try to get the SSM parameter key and value for frontpage data
             self.timestamp_parameter_key_frontpage = self.get_setting('OZBARGAIN_TIMESTAMP_FRONTPAGE_PARAMETER')
             self.timestamp_parameter_value_frontpage = self.get_setting('OZBARGAIN_TIMESTAMP_FRONTPAGE')
         except:
@@ -103,7 +106,10 @@ class Ozbargain():
                 # Try to get the file path instead
                 self.timestamp_file_frontpage = self.get_setting('OZBARGAIN_TIMESTAMP_FILE_FRONTPAGE')
             except:
-                raise Exception("No OZBARGAIN_TIMESTAMP_PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
+                pass
+
+        if not self.timestamp_parameter_key or not self.timestamp_file or not self.timestamp_parameter_key_frontpage or not self.timestamp_file_frontpage:
+            raise Exception("No OZBARGAIN_TIMESTAMP_(FRONTPAGE_)PARAMETER or OZBARGAIN_TIMESTAMP_FILE specified, where am I writing the new timestamp to?")
 
         self.ozbargain_feed_url = 'https://www.ozbargain.com.au/deals/feed'
         self.ozbargain_frontpage_feed_url = 'https://www.ozbargain.com.au/feed'
@@ -141,12 +147,12 @@ class Ozbargain():
                 self.__logger.error(f"Error setting param in SSM: {e}")
             self.__logger.info(f"Successfully updated SSM parameter '{parameter_key}' to '{value}'.")
 
-    def get_last_request_timestamp(self, timestamp_file):
+    def get_last_request_timestamp(self, timestamp_file=None, timestamp_parameter=None):
         # If file is specified and exists, grab that value
-        if self.timestamp_file:
-            self.__logger.debug(f"Timestamp file specified at: {self.timestamp_file}")
+        if timestamp_file:
+            self.__logger.debug(f"Timestamp file specified at: {timestamp_file}")
             try:
-                with open(self.timestamp_file) as file:
+                with open(timestamp_file) as file:
                     file_contents = file.read()
                     self.__logger.info(f"Current timestamp from file: {file_contents}")
                     if not file_contents:
@@ -154,12 +160,12 @@ class Ozbargain():
                     else:
                         last_request_timestamp = int(file_contents)
             except Exception as e:
-                self.__logger.error(f"Something went wrong grabbing the file data at {self.timestamp_file} (does the file exist yet?). Generating a timestamp (-{self.default_timedelta_minutes} minutes from now)...")
+                self.__logger.error(f"Something went wrong grabbing the file data at {timestamp_file} (does the file exist yet?). Generating a timestamp (-{self.default_timedelta_minutes} minutes from now)...")
                 last_request_timestamp = int(time.mktime((datetime.now() - timedelta(minutes=self.default_timedelta_minutes)).timetuple()))
         # Else try SSM
         else:
             try:
-                last_request_timestamp = int(self.timestamp_parameter_value)
+                last_request_timestamp = int(timestamp_parameter)
                 self.__logger.info(f"Current timestamp from SSM: {last_request_timestamp}")
             except Exception as e:
                 # If not file/ssm, we just take 5 mins off current time and assume deals posted since last cron runtime (assuming cron is set to 5? It better be...)
@@ -236,11 +242,19 @@ class Ozbargain():
         # Update timestamp with latest deal published timestamp
         new_epoch_timestamp = self.get_timestamp(items[0].find('pubDate').text)
         if last_request_timestamp != new_epoch_timestamp:
-            self.set_timestamp_parameter_value(
-                value=new_epoch_timestamp,
-                timestamp_file=self.timestamp_file,
-                parameter_key=self.timestamp_parameter_key
-            )
+            # If true, we're updating a frontpage timestamp
+            if slack_webhook_frontpage or discord_webhook_frontpage:
+                self.set_timestamp_parameter_value(
+                    value=new_epoch_timestamp,
+                    timestamp_file=self.timestamp_file_frontpage,
+                    parameter_key=self.timestamp_parameter_key_frontpage
+                )
+            else:
+                self.set_timestamp_parameter_value(
+                    value=new_epoch_timestamp,
+                    timestamp_file=self.timestamp_file,
+                    parameter_key=self.timestamp_parameter_key
+                )
         else:
             self.__logger.info(f"Latest deal already published to slack, no timestamp to update.")
 
@@ -455,8 +469,8 @@ class Ozbargain():
             last_request_timestamp = int(self.get_setting('TIMESTAMP_OVERRIDE'))
             self.__logger.warning(f"TIMESTAMP_OVERRIDE set to: {last_request_timestamp}")
         else:
-            last_request_timestamp = self.get_last_request_timestamp()
-            last_request_timestamp_frontpage = self.get_last_request_timestamp()
+            last_request_timestamp = self.get_last_request_timestamp(timestamp_file=self.timestamp_file, timestamp_parameter=self.timestamp_parameter_value)
+            last_request_timestamp_frontpage = self.get_last_request_timestamp(timestamp_file=self.timestamp_file_frontpage, timestamp_parameter=self.timestamp_parameter_value_frontpage)
 
         if self.slack_webhook or self.discord_webhook:
             xml_tree = self.get_xml_tree(self.ozbargain_feed_url, xml_file)
