@@ -53,8 +53,7 @@ class Ozbargain():
 
         try:
             self.slack_webhook_frontpage = self.get_setting('OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE')
-        except Exception as e:
-            self.__logger.debug(f'error: {repr(e)}')
+        except:
             self.slack_webhook_frontpage = False
         if self.slack_webhook_frontpage:
             self.__logger.debug(f'slack_webhook_frontpage url: {self.slack_webhook_frontpage}')
