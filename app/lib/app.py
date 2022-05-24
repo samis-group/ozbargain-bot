@@ -40,7 +40,7 @@ class Ozbargain():
                         self.__logger.debug(f"Could not connect to SSM. Please ensure 'OZBARGAIN_AWS_PROFILE' and 'OZBARGAIN_AWS_REGION' environment variables exist and are correct. Error: {repr(e)}")
                         self.__logger.debug("Continuing with file setup, please ensure that you have the correct environment variables set.")
         except Exception as e:
-            self.__logger.warning(f"No 'OZBARGAIN_AWS_REGION' environment variable set, this means SSM won't work. This is fine if using files or env variables for values. Error: {repr(e)}")
+            self.__logger.debug(f"No 'OZBARGAIN_AWS_REGION' environment variable set, this means SSM won't work. This is fine if using files or env variables for values. Error: {repr(e)}")
 
         try:
             self.slack_webhook = self.get_setting('OZBARGAIN_SLACK_WEBHOOK')
