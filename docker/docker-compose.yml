@@ -1,0 +1,13 @@
+---
+version: "3.7"
+services:
+  ozbargain:
+    image: registry.gitlab.com/sami-group/ozbargain_bot:latest
+    init: true
+    container_name: ozbargain
+    restart: unless-stopped
+    volumes:
+      - "${DOCKERDIR}/appdata/ozbargain:/config"
+    environment:
+      OZBARGAIN_SLACK_WEBHOOK: ${OZBARGAIN_SLACK_WEBHOOK}
+      OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE: ${OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE}

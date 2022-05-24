@@ -18,7 +18,9 @@ Obtain the Slack webhook from the [slack app page here.](https://api.slack.com/a
 
 Obtain the Discord webhook [in the app](https://discord.com/app) by right clicking your server, then click "Server settings" > Integrations.
 
-## Docker Deployment
+## Docker Deployments
+
+### docker run
 
 To deploy this in docker:
 
@@ -29,14 +31,9 @@ export OZBARGAIN_SLACK_WEBHOOK=https://hooks.slack.com/services/XXXXXXXXX/XXXXXX
 make run
 ```
 
-docker-compose example:
+### docker-compose
 
-```yaml
----
-version: "3.7"
-services:
-  
-```
+for docker-compose, check the [docker-compose.yml file as an example](docker/docker-compose.yml).
 
 ## Deploy to AWS
 
