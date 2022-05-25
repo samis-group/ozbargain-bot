@@ -107,3 +107,9 @@ exec:
 # Make a brand new container from the base image and enter shell (Useful for dev in docker containers)
 base-shell:
 	@docker run --rm -it $(image_name) /bin/sh
+
+compose-up:
+	@docker compose --env-file ./docker/.env -f ./docker/docker-compose.yml up -d
+
+compose-down:
+	@docker compose --env-file ./docker/.env -f ./docker/docker-compose.yml down

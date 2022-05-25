@@ -7,11 +7,11 @@ services:
     container_name: ozbargain
     restart: unless-stopped
     volumes:
-      - "${DOCKERDIR}/appdata/ozbargain:/config"
+      - "./ozbargain:/config"
     environment:
       OZBARGAIN_SLACK_WEBHOOK: ${OZBARGAIN_SLACK_WEBHOOK}
       OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE: ${OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE}
-      PUID: 1000
-      PGID: 1000
+      PUID: ${PUID}
+      PGID: ${PGID}
       # OZBARGAIN_TIMESTAMP_OVERRIDE: 2
-      RUN_ON_BOOT: asf
+      RUN_ON_BOOT: yes

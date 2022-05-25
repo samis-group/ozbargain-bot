@@ -1,12 +1,10 @@
 # Ozbargain Bot
 
-This bot can post to both discord and slack and can post both [new deals as they come in from here](https://www.ozbargain.com.au/deals), and it can post deals that reach [the frontpage of ozbargain here](https://www.ozbargain.com.au/).
+This bot can post to both **discord** and **slack**, and can post both [new deals as they come in from here](https://www.ozbargain.com.au/deals), and it can post deals that reach [the frontpage of ozbargain here](https://www.ozbargain.com.au/).
 
 You can configure it to post these to two separate webhooks allowing you to simultaneously post both of these deal pages in one app deployment, or you can configure the app to only post one of these.
 
-This can post to both **discord and slack**.
-
-Python code can be built in both **AWS** or on a **linux machine**.
+Python code can be built in **AWS**, **Docker** or on a **linux machine**(DIY).
 
 ## Initial Setup
 
@@ -18,24 +16,36 @@ Obtain the Slack webhook from the [slack app page here.](https://api.slack.com/a
 
 Obtain the Discord webhook [in the app](https://discord.com/app) by right clicking your server, then click "Server settings" > Integrations.
 
-## Docker Deployments
+## Deployments
 
-### docker run
+### Docker
 
-To deploy this in docker:
+Run the 'setup' make target in order to create your `.env` file that you'll pass into the container. This will also prompt you with common things the container can do:
 
 ```shell
-# This will setup the local env and prompt you with common things the container can do
 make setup
-# Now the main target makes this whole thing come alive
+```
+
+#### docker run (build locally)
+
+To deploy this in docker, the main make target, creates this whole thing in a new container:
+
+```shell
 make
 ```
 
-### docker-compose
+#### docker compose (public container)
 
-for docker-compose, check the [docker-compose.yml file as an example](docker/docker-compose.yml).
+for docker compose, check my [docker-compose.yml file as an example](docker/docker-compose.yml). Bring it up with this one command:
 
-## Deploy to AWS
+```shell
+# Assumes you've already run `make setup` and populated the .env file with hooks, etc.
+make compose-up
+# And when finished with it
+make compose-down
+```
+
+### AWS
 
 This script requires the use of AWS SSM Parameters store to store timestamp data. We'll also use SAM to deploy this so make sure that's all installed and configured in your local environment.
 
@@ -77,7 +87,9 @@ sam build --use-container
 sam deploy --stack-name ozbargainbot --region ap-southeast-2 --s3-bucket <some_bucket> --capabilities CAPABILITY_IAM
 ```
 
-## Deploy to Linux Instance
+### Linux
+
+**NOT TESTED**. This is essentially DIY, just use the docker image if you want it done easy, I've even built you make targets to make it easy. Just scroll up.
 
 Hard code the values for these keys in the environment variables without the **_PARAMETER** suffix (you can use a file to record/get timestamp):
 
