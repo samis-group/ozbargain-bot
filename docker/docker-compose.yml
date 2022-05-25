@@ -1,0 +1,18 @@
+---
+version: "3.7"
+services:
+  ozbargain_bot:
+    image: registry.gitlab.com/sami-group/ozbargain_bot:latest
+    init: true
+    container_name: ozbargain_bot
+    restart: unless-stopped
+    volumes:
+      - "../ozbargain:/config"
+    environment:
+      OZBARGAIN_SLACK_WEBHOOK: ${OZBARGAIN_SLACK_WEBHOOK}
+      OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE: ${OZBARGAIN_SLACK_WEBHOOK_FRONTPAGE}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      # OZBARGAIN_TIMESTAMP_OVERRIDE: 2
+      RUN_ON_BOOT: yes
+      TZ: Australia/Sydney
