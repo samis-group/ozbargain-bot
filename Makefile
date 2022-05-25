@@ -1,6 +1,6 @@
 .PHONY: env stop rm image-rm build build-no-cache run exec base-shell
 
-image_name = my_ozbargain_bot
+image_name = ozbargain_bot
 
 up: build-no-cache run
 

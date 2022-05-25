@@ -21,6 +21,7 @@ COPY docker/cronjobs /etc/crontabs/root
 # Setup container
 RUN pip install pipenv && \
   pipenv install --system && \
+  apk add --no-cache tzdata && \
   chmod +x /app/entrypoint.sh
 
 # Create an entrypoint script to wrap the container and do fancy things
