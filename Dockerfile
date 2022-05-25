@@ -1,3 +1,4 @@
+# Alpine slim image
 FROM python:3-alpine
 
 LABEL maintainer="Sami Shakir"
@@ -9,33 +10,24 @@ ENV LOG_FILE="${CONFIG_DIR}/app.log" \
 OZBARGAIN_TIMESTAMP_FILE="${CONFIG_DIR}/oz2slack.timestamp" \
 OZBARGAIN_TIMESTAMP_FILE_FRONTPAGE="${CONFIG_DIR}/oz2slack.timestamp.frontpage"
 
+WORKDIR /app
 # Copy app source
-COPY app ${PROJ_DIR}
-
+COPY app .
+# Copy entrypoint.sh
+COPY docker/entrypoint.sh ./entrypoint.sh
 # copy crontab for root user
 COPY docker/cronjobs /etc/crontabs/root
 
-# Copy entrypoint.sh
-COPY docker/entrypoint.sh /app/entrypoint.sh
-
 # Setup container
-WORKDIR ${PROJ_DIR}
 RUN pip install pipenv && \
   pipenv install --system && \
-  printenv > /etc/environment && \
   chmod +x /app/entrypoint.sh
-  # crontab /etc/crontabs/root
 
-# Run it initially as the container boots because cron won't run it as it loads - not working, not providing a stack trace either..
-# RUN python ${PROJ_DIR}/lambda_handler.py >> ${LOG_FILE} 2>&1
-
-# Create an entrypoint script to wrap the container and do things
+# Create an entrypoint script to wrap the container and do fancy things
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# start crond with log level 8 in foreground, output to stderr
+# start crond with log level 8 in foreground, output to stderr - Using entrypoint shell script above instead
 # CMD ["crond", "-f", "-d", "8"]
 
-# crond runs per default in the background
-# CMD crond && tail -f ${LOG_FILE}
-
-VOLUME ${CONFIG_DIR}
+# Allow host bind mount of config containing timestamp data and logs
+VOLUME /config

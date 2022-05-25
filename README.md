@@ -25,10 +25,10 @@ Obtain the Discord webhook [in the app](https://discord.com/app) by right clicki
 To deploy this in docker:
 
 ```shell
+# This will setup the local env and prompt you with common things the container can do
 make setup
-make build
-export OZBARGAIN_SLACK_WEBHOOK=https://hooks.slack.com/services/XXXXXXXXX/XXXXXXXXXXX/XXXXXXXXXXXXXX
-make run
+# Now the main target makes this whole thing come alive
+make
 ```
 
 ### docker-compose
