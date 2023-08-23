@@ -36,7 +36,7 @@ make
 
 #### docker compose (public container)
 
-for docker compose, check my [docker-compose.yml file as an example](docker/docker-compose.yml). Bring it up with this one command:
+for docker compose, check my [docker-compose.yml file as an example](examples/docker-compose.yml). Bring it up with this one command:
 
 ```shell
 # Assumes you've already run `make setup` and populated the .env file with hooks, etc.
@@ -44,6 +44,10 @@ make compose-up
 # And when finished with it
 make compose-down
 ```
+
+#### Kubernetes manifests
+
+for k8s, I've created an [example manifest here](examples/k8s.yaml) that is tested working in my k3s cluster.
 
 ### AWS
 
