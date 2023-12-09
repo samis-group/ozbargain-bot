@@ -1,0 +1,5 @@
+---
+area/app:
+  - "app/**"
+area/docker:
+  - "docker/**"

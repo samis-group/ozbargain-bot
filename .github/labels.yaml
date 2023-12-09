@@ -1,0 +1,10 @@
+---
+# Area
+- name: area/app
+  color: "72ccf3"
+  description: >-
+    Changes made in the app source code
+- name: area/docker
+  color: "72ccf3"
+  description: >-
+    Changes made to the docker image

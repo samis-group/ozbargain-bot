@@ -1,6 +1,6 @@
 .PHONY: env stop rm image-rm build build-no-cache run exec base-shell
 
-image_name = ozbargain_bot
+image_name = ozbargain-bot
 
 up: build-no-cache run
 
@@ -87,10 +87,10 @@ image-rm:
 build-run: build run
 
 build:
-	@docker build -t $(image_name) .
+	@docker build -t $(image_name) -f docker/Dockerfile .
 
 build-no-cache:
-	@docker build --no-cache -t $(image_name) .
+	@docker build --no-cache -t $(image_name) -f docker/Dockerfile .
 
 run:
 	@docker run -d \
