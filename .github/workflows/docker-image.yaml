@@ -82,7 +82,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image to ghcr.io
-        id: build-and-push
+        id: build-and-push-ghcr
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -114,7 +114,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image to docker.io
-        id: build-and-push
+        id: build-and-push-docker
         uses: docker/build-push-action@v5
         with:
           context: .
