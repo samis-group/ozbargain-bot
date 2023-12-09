@@ -50,7 +50,7 @@ jobs:
         #   driver-opts: |
         #     image=moby/buildkit:v0.10.6
 
-      - name: Extract Docker metadata
+      - name: Extract Docker metadata for GHCR
         id: metadata-ghcr
         uses: docker/metadata-action@v5
         with:
@@ -67,9 +67,9 @@ jobs:
             # pull request event
             type=ref,event=pr
             # minimal (short sha)
-            type=sha
+            type=sha,prefix=,format=short,enable=true
             # full length sha
-            type=sha,format=long
+            type=sha,prefix=,format=long,enable=true
             # type=semver,pattern={{version}}
             # type=semver,pattern={{major}}.{{minor}}
             # type=schedule
@@ -95,19 +95,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # - name: Build and push Docker image to ghcr.io
-      #   id: build-and-push-ghcr
-      #   env:
-      #     REGISTRY: ghcr.io
-      #     IMAGE_TAG: latest
-      #   run: |
-      #     echo ${{ secrets.GHCR_TOKEN }} | docker login -u ${{ github.actor }} $REGISTRY --password-stdin
-      #     docker build -t $REGISTRY/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG -f docker/workstation/Dockerfile .
-      #     echo "Pushing image to GHCR..."
-      #     docker push $REGISTRY/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
-      #     echo "::set-output name=image::$REGISTRY/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG"
-
-      - name: Extract Docker metadata
+      - name: Extract Docker metadata for Docker Hub
         id: metadata-docker
         uses: docker/metadata-action@v5
         with:
