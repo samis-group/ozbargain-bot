@@ -1,6 +1,7 @@
 # Alpine slim image
 FROM python:3-alpine
 
+# Labels
 LABEL maintainer="Sami Shakir"
 LABEL org.opencontainers.image.source="https://github.com/samis-group/ozbargain-bot"
 
