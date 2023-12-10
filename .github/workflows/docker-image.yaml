@@ -6,12 +6,8 @@ on:
     paths:
       - 'app/**'
       - 'docker/**'
-      - 'Dockerfile'
-      - 'provision/ansible/requirements.yml'
-      - 'provision/ansible/roles/requirements.yml'
-      - 'requirements.txt'
-    tags:
-      - 'v*'
+    # tags:
+    #   - 'v*'
   pull_request:
     branches:
       - 'main'
