@@ -1,5 +1,7 @@
 # Ozbargain Bot
 
+[![Docker Image - OzBargain-Bot](https://github.com/samis-group/ozbargain-bot/actions/workflows/docker-image.yaml/badge.svg)](https://github.com/samis-group/ozbargain-bot/actions/workflows/docker-image.yaml)
+
 This bot can post to both **discord** and **slack**, and can post both [new deals as they come in from here](https://www.ozbargain.com.au/deals), and it can post deals that reach [the frontpage of ozbargain here](https://www.ozbargain.com.au/).
 
 You can configure it to post these to two separate webhooks allowing you to simultaneously post both of these deal pages in one app deployment, or you can configure the app to only post one of these.
