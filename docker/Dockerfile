@@ -2,6 +2,7 @@
 FROM python:3-alpine
 
 LABEL maintainer="Sami Shakir"
+LABEL org.opencontainers.image.source="https://github.com/samis-group/ozbargain-bot"
 
 ENV PROJ_DIR="/app" \
 CONFIG_DIR="/config"
